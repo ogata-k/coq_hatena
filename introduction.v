@@ -1,4 +1,4 @@
-(* この中はコメント。(* 入れ子も可能 *)
+(* file: introduction.v
   The Coq Proof Assistant, version 8.11.0 (January 2020)
   compiled on Jan 24 2020 22:35:23 with OCaml 4.07.1
 *)
