@@ -85,20 +85,21 @@ Section introduction.
   
   (* 証明できたのでこの証明を構築するための関数が実装されている。それを確認する *)
   Print and_r_or_desc.
-  (* 試しに計算してみる *)
+  (* 付属情報付き詳細表示 *)
   Print True.
   Print False. (* Coqでは~PはPの否定で、FalseはP/\~Pと同じ。 つまり矛盾のこと *)
-  (* 代入する。命題なので単純化はされない。 *)
+  (* 計算して表示する *)
   Eval compute in (and_r_or_desc True False False).
-  (* 計算が通ることを確認するCheckでも同じ結果が得られる *)
+  (* 存在および代入ができることを計算する *)
   Check (and_r_or_desc True False False).
 
 
   Section monoid.
-    (* インスタンスを作る構造を定義 *)
-    Class Monoid M := monoid{
+    (* 型クラスを定義。型クラスは型のためのレコードといったイメージ *)
+    Class Monoid (M: Set) (op: M -> M -> M): Set := monoid{
        (* 持っていてほしい情報 *)
-       op : M -> M -> M;
+       MSet := M;
+       op := op;
        e : M;
        
        (* 公理 *)
@@ -106,25 +107,86 @@ Section introduction.
        e_l: forall a: M, op e a = a;
        e_r: forall a: M, op a e = a;
     }.
+    Print Monoid.
     Print e.
+    Check op.
+    Print op.
+    (* 上記のopでは型推論してくれたが頭に@を付けると型推論しないようにできる *)
+    Check @op.
+    (* 
+      このままだとCheck (op nat (fun x y => s+y) nat_monoid 4 5)と与えないといけないので
+      Check (op nat_monoid 4 5)とできるようにするためにあらかじめ型推論として省略できるようにしておく
+     
+       {}で囲むと型推論しながらの自動省略の対象
+       []で囲むと型詩論済みとしての自動省略の対象
+       括弧無しは明示的引数の対象
+      
+      のように思われる。（調べきれてない）
+      省略可能なLocal/Globalはおそらく外部公開されるかどうかの違いくらいしかないと思うが、不明。
+    *)
+    Global Arguments op [M] [op].
+    Local Arguments e [M] [op].
+    Check op.
+    Check @op.
+    Check e.
+    Check @e.
     
-    Program Instance nat_monoid : Monoid nat := {|
-      op := fun m n => m + n;
+    Definition add_n_m (n m: nat): nat := n + m.
+    Instance nat_monoid : Monoid nat add_n_m := {|
       e := 0;
-      assoc:= plus_assoc_reverse;
-      e_l:= Nat.add_0_l;
-      e_r:= Nat.add_0_r;
+      assoc := plus_assoc_reverse;
+      e_l := Nat.add_0_l;
+      e_r := Nat.add_0_r;
     |}.
+    Check (op nat_monoid 4 5).
+    Eval compute in (e nat_monoid).
+    Eval compute in (op nat_monoid 4 (e nat_monoid)).
     
     
     (* Haskellのようなフィールド組として扱いたいとき。Recordの代わりにStructureでも可 *)
-    Record ToNatConvertrt (T: Type): Type := converter{first: T -> T; second: T -> T}.
+    Record ToNatPaitConverter (T: Type): Type := converter{first: T -> nat; second: T -> nat}.
     Print converter.
-    Check (converter nat).
+    Check (converter nat). 
     (* 本来なら関数定義通りに上記のようにnatという型を教えてあげる必要があるが、Argumentsによってそれを省略するように指定する *)
-    Arguments converter [T] _.
+    Arguments converter [T] _ _.
     Check converter.
-    Check (fun n: Monoid nat => op n n).
-    Eval compute in ( converter (fun n: Monoid nat => e) (fun n: Monoid nat => op n n) ).
+    (* 下の関数で計算させる *)
+    Definition exampleConverter: ToNatPaitConverter nat := converter id (fun n: nat => op nat_monoid n n).
+    Eval compute in exampleConverter.
+    
+     Definition doConvert (T: Type) (cvter: @ToNatPaitConverter T) (t: T): (nat * nat) := 
+      let (first, second) := cvter in (first t, second t).
+    Eval compute in (doConvert nat exampleConverter 10).
+    
+    
+    (* 別の方法として定義する。こちらはMonoidのまま計算する *)
+    Class Monoid' (M': Set): Set := monoid'{
+       (* 持っていてほしい情報 *)
+       MSet' := M';
+       (* Recordでclassのようにop'等を拡張して使うには:の代わりに:>を使う必要がある *)
+       op' : M' -> M' -> M';
+       e' : M';
+       
+       (* 公理 *)
+       assoc': forall a b c : M', (op' (op' a b) c) = (op' a (op' b c));
+       e_l': forall a: M', op' e' a = a;
+       e_r': forall a: M', op' a e' = a;
+    }.
+    
+    Check (Monoid' nat).
+    Check MSet'.
+    Check e'.
+    Check e_l'((fun x: Monoid' nat => op' x x) e').
+    Eval compute in ((fun n: Monoid' nat => op' n (op' n n)) e').
+    Eval compute in e'.
+    Eval compute in (op' 4 e').
+    
+    Record Pair (T: Set): Type := makePair{fst: T; snd: T}.
+    Print makePair.
+    Arguments makePair [T] _ _.
+    Print makePair.
+    Check makePair.
+    Definition duplicate (S: Set) (m: Monoid' S): Pair (Monoid' S) := 
+      makePair m m.
   End monoid.
 End  introduction.
